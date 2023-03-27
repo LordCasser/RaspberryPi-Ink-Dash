@@ -15,20 +15,19 @@ FONT_PATH = "/usr/share/fonts/truetype/DejavuNerd"
 INFO_TIME = 10
 HALT_TIME = 180
 sleep_time = INFO_TIME
-# 既可以判断执行是否成功，还可以获取执行结果
 
 
 def subprocess_popen(statement):
     p = subprocess.Popen(statement, shell=True,
-                         stdout=subprocess.PIPE)  # 执行shell语句并定义输出格式
-    while p.poll() is None:  # 判断进程是否结束（Popen.poll()用于检查子进程（命令）是否已经执行结束，没结束返回None，结束后返回状态码）
-        if not p.wait() == 0:  # 判断是否执行成功（Popen.wait()等待子进程结束，并返回状态码；如果设置并且在timeout指定的秒数之后进程还没有结束，将会抛出一个TimeoutExpired异常。）
-            print("命令执行失败，请检查设备连接状态")
-            return False
+                         stdout=subprocess.PIPE)
+    while p.poll() is None:
+        if not p.wait() == 0:
+            logging.info("exec", statement, "failed. Return Code is ", p.returncode)
+            return []
         else:
-            re = p.stdout.readlines()  # 获取原始执行结果
+            re = p.stdout.readlines()
             result = []
-            for i in range(len(re)):  # 由于原始结果需要转换编码，所以循环转为utf8编码并且去除\n换行
+            for i in range(len(re)):
                 res = re[i].decode('utf-8').strip('\r\n')
                 result.append(res)
             return result
@@ -77,14 +76,16 @@ def get_total_mem():
     # # 总内存
     return subprocess_popen("cat /proc/meminfo | grep MemTotal")
 
+
 def get_cpu_temp():
-    tempFile = open( "/sys/class/thermal/thermal_zone0/temp" )
+    tempFile = open("/sys/class/thermal/thermal_zone0/temp")
     cpu_temp = tempFile.read()
     tempFile.close()
     return float(cpu_temp)/1000
 
+
 def get_rest_mem():
-    return subprocess_popen("cat /proc/meminfo | grep MemFree")
+    return subprocess_popen("cat /proc/meminfo | grep MemAvailable")
 
 
 def get_load():
@@ -120,7 +121,8 @@ if __name__ == '__main__':
         epd.init()
         epd.Clear(0xFF)
 
-        logging.info(os.path.join(FONT_PATH, 'DejaVu Sans Mono Nerd Font Complete Mono.ttf'))
+        logging.info(os.path.join(
+            FONT_PATH, 'DejaVu Sans Mono Nerd Font Complete Mono.ttf'))
         font15 = ImageFont.truetype(os.path.join(
             FONT_PATH, 'DejaVu Sans Mono Nerd Font Complete Mono.ttf'), 15)
         font20 = ImageFont.truetype(os.path.join(
@@ -177,14 +179,13 @@ if __name__ == '__main__':
                 icon = ""
             hostname = get_hostname()[0]
             draw.text((0, 0), hostname, font=font30, fill=0)
-            draw.text((250-len(ssid)*12-30,-2), icon, font=font_icon, fill=0)
-            draw.text((250-len(ssid)*12-4,8), ssid, font=font20, fill=0)
+            draw.text((250-len(ssid)*12-30, -2), icon, font=font_icon, fill=0)
+            draw.text((250-len(ssid)*12-4, 8), ssid, font=font20, fill=0)
 
             # IP
             # message = '%s: %s' % (get_wlan()[0].split(":")[1].replace('"',''), get_external_ip())
             wlan_info = get_internal_wlan_ip()
             if wlan_info == None:
-                sleep_time = INFO_TIME
                 wlans = get_wlan_list()
                 if len(wlans) >= 2:
                     random.shuffle(wlans)
@@ -192,7 +193,6 @@ if __name__ == '__main__':
                 else:
                     message = 'wlan: %s' % wlans[0]
             else:
-                sleep_time = HALT_TIME
                 message = '%s: %s' % get_internal_wlan_ip()
             draw.text((0, 40), message, font=font20, fill=0)
             message = '%s: %s' % get_internal_eth_ip()
@@ -233,6 +233,11 @@ if __name__ == '__main__':
                         logging.info("partial flush")
             epd.sleep()
             time.sleep(sleep_time)
+
+            if wlan_info == None:
+                sleep_time = INFO_TIME
+            else:
+                sleep_time = HALT_TIME
 
         except IOError as e:
             logging.info(e)
